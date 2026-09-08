@@ -6,6 +6,32 @@
 
 ---
 
+## ⚠️ 重要：GitHub Token 必须勾选 `workflow` scope
+
+GitHub 自 2023 年起强制要求：使用 Personal Access Token 推送 `.github/workflows/*.yml` 文件时，Token 必须有 **`workflow`** scope，否则会被拒绝：
+
+```
+remote: refusing to allow a Personal Access Token to create or update workflow
+`.github/workflows/deploy.yml` without `workflow` scope
+```
+
+**两种解法**：
+1. **生成 Token 时多勾一项 `workflow`**（推荐，全部代码一次推上去）
+2. **暂时移走 `deploy.yml`**，先推主代码，之后再补推（Cloudflare Pages 不需要 GitHub Actions，可以忽略这个文件）
+
+---
+
+## ⚠️ 国内网络环境
+
+若推送报 `Empty reply from server` 或连接被截断，通常是 mihomo/Clash 代理没被 git 识别。解决：
+
+```bash
+# 单次推送时强制走代理
+git -c http.proxy=http://127.0.0.1:7890 -c https.proxy=http://127.0.0.1:7890 push ...
+```
+
+---
+
 ## 方案 A · Cloudflare Pages（推荐，免费 + 全球 CDN + 自动 HTTPS）
 
 ### Step 1 · 把代码推到 GitHub
