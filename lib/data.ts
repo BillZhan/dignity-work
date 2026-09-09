@@ -6,8 +6,6 @@ import {
   Submission,
   Report,
 } from "./types";
-import { MOCK_COMPANIES, MOCK_SUBMISSIONS, MOCK_REPORTS } from "./mock-data";
-import { getSupabase } from "./supabase";
 
 // ============================================================
 //  浏览器侧 visitor 标识（防刷票用）
@@ -28,29 +26,47 @@ export function getVisitorId(): string {
 }
 
 // ============================================================
-//  客户端 localStorage 辅助（仅 mock 模式下使用）
+//  通用 fetch 辅助
 // ============================================================
-function lsGet<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
+async function api<T = any>(input: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(input, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+    credentials: "include", // 携带 admin cookie
+  });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { msg = ((await res.json()) as any).error || msg; } catch {}
+    throw new Error(`${res.status} ${msg}`);
   }
-}
-function lsSet(key: string, val: unknown) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(val));
-  } catch {
-    /* ignore */
-  }
+  return res.json() as Promise<T>;
 }
 
-// 支持记录的本地持久化（key = `${companyId}:${visitorId}`）
-const SUPPORT_LS = "dignity_supports";
-const SUPPORT_COUNT_LS = "dignity_support_counts";
+// 把 D1 整数时间戳（Unix ms）转换为 ISO 字符串
+function toIso(v: any): string {
+  if (typeof v === "number") return new Date(v).toISOString();
+  if (typeof v === "string") return v;
+  return new Date().toISOString();
+}
+
+function normalizeCompany(c: any): Company {
+  return {
+    ...c,
+    created_at: toIso(c.created_at),
+    updated_at: toIso(c.updated_at),
+  };
+}
+
+function normalizeSubmission(s: any): Submission {
+  return { ...s, created_at: toIso(s.created_at) };
+}
+
+function normalizeReport(r: any): Report {
+  return { ...r, created_at: toIso(r.created_at) };
+}
 
 // ============================================================
 //  Companies — 列表 / 详情 / 支持
@@ -59,7 +75,7 @@ const SUPPORT_COUNT_LS = "dignity_support_counts";
 export function useCompanies(opts?: {
   search?: string;
   industry?: string;
-  rightKeys?: string[]; // 任一匹配
+  rightKeys?: string[];
 }) {
   const [data, setData] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,64 +85,22 @@ export function useCompanies(opts?: {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const sb = getSupabase();
-    if (sb) {
-      let q = sb
-        .from("companies")
-        .select("*, labor_rights(*)")
-        .eq("status", "published")
-        .order("support_count", { ascending: false });
-      if (opts?.industry) q = q.eq("industry", opts.industry);
-      const { data: rows, error: err } = await q;
-      if (err) {
-        setError(err.message);
-      } else {
-        let list = (rows || []).map((r: any) => ({ ...r, rights: r.labor_rights }));
-        if (opts?.search) {
-          const s = opts.search.toLowerCase();
-          list = list.filter(
-            (c) =>
-              c.name.toLowerCase().includes(s) ||
-              (c.products || "").toLowerCase().includes(s) ||
-              (c.description || "").toLowerCase().includes(s)
-          );
-        }
-        if (opts?.rightKeys && opts.rightKeys.length > 0) {
-          list = list.filter((c) =>
-            opts.rightKeys!.every((k) => c.rights?.[k as keyof typeof c.rights])
-          );
-        }
-        setData(list);
-      }
-    } else {
-      // mock 模式
-      const countDelta = lsGet<Record<string, number>>(SUPPORT_COUNT_LS, {});
-      let list = MOCK_COMPANIES.filter((c) => c.status === "published").map(
-        (c) => ({
-          ...c,
-          support_count: c.support_count + (countDelta[c.id] || 0),
-        })
-      );
-      if (opts?.industry) list = list.filter((c) => c.industry === opts.industry);
-      if (opts?.search) {
-        const s = opts.search.toLowerCase();
-        list = list.filter(
-          (c) =>
-            c.name.toLowerCase().includes(s) ||
-            (c.products || "").toLowerCase().includes(s) ||
-            (c.description || "").toLowerCase().includes(s)
-        );
-      }
-      if (opts?.rightKeys && opts.rightKeys.length > 0) {
-        list = list.filter((c) =>
-          opts.rightKeys!.every((k) => c.rights?.[k as keyof typeof c.rights])
-        );
-      }
-      setData(list);
+    try {
+      const params = new URLSearchParams();
+      if (opts?.industry) params.set("industry", opts.industry);
+      if (opts?.search) params.set("search", opts.search);
+      if (rightKeysStr) params.set("rightKeys", rightKeysStr);
+      const qs = params.toString();
+      const url = `/api/companies${qs ? `?${qs}` : ""}`;
+      const rows = await api<Company[]>(url);
+      setData(rows.map(normalizeCompany));
+      setError(null);
+    } catch (e: any) {
+      setError(e.message || "加载失败");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [opts?.search, opts?.industry, rightKeysStr]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     refresh();
@@ -141,26 +115,14 @@ export function useCompany(slug: string) {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const sb = getSupabase();
-    if (sb) {
-      const { data: rows } = await sb
-        .from("companies")
-        .select("*, labor_rights(*)")
-        .eq("slug", slug)
-        .eq("status", "published")
-        .maybeSingle();
-      if (rows) setData({ ...(rows as any), rights: (rows as any).labor_rights });
-    } else {
-      const base = MOCK_COMPANIES.find((c) => c.slug === slug);
-      const countDelta = lsGet<Record<string, number>>(SUPPORT_COUNT_LS, {});
-      if (base) {
-        setData({
-          ...base,
-          support_count: base.support_count + (countDelta[base.id] || 0),
-        });
-      }
+    try {
+      const row = await api<Company>(`/api/companies/${encodeURIComponent(slug)}`);
+      setData(normalizeCompany(row));
+    } catch {
+      setData(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [slug]);
 
   useEffect(() => {
@@ -171,55 +133,47 @@ export function useCompany(slug: string) {
 }
 
 // ============================================================
-//  支持 — 支持 / 已支持？
+//  支持
 // ============================================================
 
 export function useHasSupported(companyId?: string) {
+  // 简化版：每个 (companyId, visitorId) 在 supports 表里唯一，客户端通过 local 记忆
   const [supported, setSupported] = useState(false);
 
   useEffect(() => {
-    if (!companyId) return;
-    const sb = getSupabase();
+    if (!companyId || typeof window === "undefined") return;
     const visitor = getVisitorId();
-    if (sb) {
-      sb.from("supports")
-        .select("id")
-        .eq("company_id", companyId)
-        .eq("visitor_id", visitor)
-        .maybeSingle()
-        .then(({ data }) => setSupported(!!data));
-    } else {
-      const map = lsGet<Record<string, string[]>>(SUPPORT_LS, {});
-      setSupported((map[companyId] || []).includes(visitor));
+    const key = `dignity_supported:${visitor}`;
+    try {
+      const list = JSON.parse(window.localStorage.getItem(key) || "[]") as string[];
+      setSupported(list.includes(companyId));
+    } catch {
+      setSupported(false);
     }
   }, [companyId]);
 
   return supported;
 }
 
-export async function supportCompany(companyId: string): Promise<boolean> {
-  const sb = getSupabase();
+export async function supportCompany(companyId: string, slug: string): Promise<boolean> {
   const visitor = getVisitorId();
-  if (sb) {
-    const { error } = await sb
-      .from("supports")
-      .insert({ company_id: companyId, visitor_id: visitor });
-    if (error) {
-      if (error.code === "23505") return false; // 已支持
-      throw error;
+  try {
+    const res = await api<{ ok: boolean; reason?: string }>(
+      `/api/companies/${encodeURIComponent(slug)}/support`,
+      { method: "POST", body: JSON.stringify({ visitor_id: visitor }) }
+    );
+    if (res.ok) {
+      // 本地记录已支持
+      const key = `dignity_supported:${visitor}`;
+      try {
+        const list = JSON.parse(window.localStorage.getItem(key) || "[]") as string[];
+        if (!list.includes(companyId)) list.push(companyId);
+        window.localStorage.setItem(key, JSON.stringify(list));
+      } catch {}
     }
-    return true;
-  } else {
-    const map = lsGet<Record<string, string[]>>(SUPPORT_LS, {});
-    const list = map[companyId] || [];
-    if (list.includes(visitor)) return false;
-    map[companyId] = [...list, visitor];
-    lsSet(SUPPORT_LS, map);
-
-    const counts = lsGet<Record<string, number>>(SUPPORT_COUNT_LS, {});
-    counts[companyId] = (counts[companyId] || 0) + 1;
-    lsSet(SUPPORT_COUNT_LS, counts);
-    return true;
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -234,22 +188,7 @@ export async function submitCompany(payload: {
   website?: string;
   image?: string;
 }): Promise<void> {
-  const sb = getSupabase();
-  if (sb) {
-    const { error } = await sb.from("submissions").insert(payload);
-    if (error) throw error;
-  } else {
-    const list = lsGet<Submission[]>("dignity_submissions", [
-      ...MOCK_SUBMISSIONS,
-    ]);
-    list.unshift({
-      id: "local-" + Date.now(),
-      ...payload,
-      status: "pending",
-      created_at: new Date().toISOString(),
-    });
-    lsSet("dignity_submissions", list);
-  }
+  await api(`/api/submissions`, { method: "POST", body: JSON.stringify(payload) });
 }
 
 export async function submitReport(payload: {
@@ -257,28 +196,12 @@ export async function submitReport(payload: {
   reason: string;
   description?: string;
 }): Promise<void> {
-  const sb = getSupabase();
-  if (sb) {
-    const { error } = await sb.from("reports").insert(payload);
-    if (error) throw error;
-  } else {
-    const list = lsGet<Report[]>("dignity_reports", [...MOCK_REPORTS]);
-    list.unshift({
-      id: "local-" + Date.now(),
-      ...payload,
-      status: "pending",
-      created_at: new Date().toISOString(),
-    });
-    lsSet("dignity_reports", list);
-  }
+  await api(`/api/reports`, { method: "POST", body: JSON.stringify(payload) });
 }
 
 // ============================================================
-//  Admin — 仅用于后台（mock 模式靠 localStorage 持久化）
+//  Admin — 仅用于后台（鉴权由 /api/admin/* 中间件保护）
 // ============================================================
-// 注意：admin 鉴权已在 /api/admin/* 通过 Cloudflare Pages Functions
-// 完成（HttpOnly cookie + HMAC 签名），密码永不下发到客户端。
-// 这里只保留管理后台的数据读写函数。
 
 export function useAdminCompanies() {
   const [data, setData] = useState<Company[]>([]);
@@ -286,26 +209,17 @@ export function useAdminCompanies() {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const sb = getSupabase();
-    if (sb) {
-      const { data: rows } = await sb
-        .from("companies")
-        .select("*, labor_rights(*)")
-        .order("created_at", { ascending: false });
-      setData(
-        (rows || []).map((r: any) => ({ ...r, rights: r.labor_rights }))
-      );
-    } else {
-      setData(
-        lsGet<Company[]>("dignity_admin_companies", [...MOCK_COMPANIES])
-      );
+    try {
+      const rows = await api<Company[]>(`/api/admin/companies`);
+      setData(rows.map(normalizeCompany));
+    } catch {
+      setData([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   return { data, loading, refresh };
 }
@@ -316,24 +230,17 @@ export function useAdminSubmissions() {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const sb = getSupabase();
-    if (sb) {
-      const { data: rows } = await sb
-        .from("submissions")
-        .select("*")
-        .order("created_at", { ascending: false });
-      setData(rows || []);
-    } else {
-      setData(
-        lsGet<Submission[]>("dignity_submissions", [...MOCK_SUBMISSIONS])
-      );
+    try {
+      const rows = await api<Submission[]>(`/api/admin/submissions`);
+      setData(rows.map(normalizeSubmission));
+    } catch {
+      setData([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   return { data, loading, refresh };
 }
@@ -344,90 +251,50 @@ export function useAdminReports() {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const sb = getSupabase();
-    if (sb) {
-      const { data: rows } = await sb
-        .from("reports")
-        .select("*")
-        .order("created_at", { ascending: false });
-      setData(rows || []);
-    } else {
-      setData(lsGet<Report[]>("dignity_reports", [...MOCK_REPORTS]));
+    try {
+      const rows = await api<Report[]>(`/api/admin/reports`);
+      setData(rows.map(normalizeReport));
+    } catch {
+      setData([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   return { data, loading, refresh };
 }
 
 export async function adminUpdateCompany(c: Company): Promise<void> {
-  const sb = getSupabase();
-  if (sb) {
-    const { id, rights, ...rest } = c;
-    await sb.from("companies").update(rest).eq("id", id);
-    if (rights) {
-      await sb.from("labor_rights").upsert({ company_id: id, ...rights });
-    }
-  } else {
-    const list = lsGet<Company[]>(
-      "dignity_admin_companies",
-      [...MOCK_COMPANIES]
-    );
-    const idx = list.findIndex((x) => x.id === c.id);
-    if (idx >= 0) list[idx] = c;
-    lsSet("dignity_admin_companies", list);
-  }
+  await api(`/api/admin/companies/${encodeURIComponent(c.id)}`, {
+    method: "PUT",
+    body: JSON.stringify(c),
+  });
 }
 
 export async function adminDeleteCompany(id: string): Promise<void> {
-  const sb = getSupabase();
-  if (sb) {
-    await sb.from("companies").delete().eq("id", id);
-  } else {
-    const list = lsGet<Company[]>(
-      "dignity_admin_companies",
-      [...MOCK_COMPANIES]
-    );
-    lsSet(
-      "dignity_admin_companies",
-      list.filter((x) => x.id !== id)
-    );
-  }
+  await api(`/api/admin/companies/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }
 
 export async function adminUpdateSubmissionStatus(
   id: string,
   status: Submission["status"]
 ): Promise<void> {
-  const sb = getSupabase();
-  if (sb) {
-    await sb.from("submissions").update({ status }).eq("id", id);
-  } else {
-    const list = lsGet<Submission[]>(
-      "dignity_submissions",
-      [...MOCK_SUBMISSIONS]
-    );
-    const idx = list.findIndex((x) => x.id === id);
-    if (idx >= 0) list[idx].status = status;
-    lsSet("dignity_submissions", list);
-  }
+  await api(`/api/admin/submissions/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }
 
 export async function adminUpdateReportStatus(
   id: string,
   status: Report["status"]
 ): Promise<void> {
-  const sb = getSupabase();
-  if (sb) {
-    await sb.from("reports").update({ status }).eq("id", id);
-  } else {
-    const list = lsGet<Report[]>("dignity_reports", [...MOCK_REPORTS]);
-    const idx = list.findIndex((x) => x.id === id);
-    if (idx >= 0) list[idx].status = status;
-    lsSet("dignity_reports", list);
-  }
+  await api(`/api/admin/reports/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }

@@ -1,0 +1,8 @@
+name = "dignity-work"
+pages_build_output_dir = "./out"
+compatibility_date = "2024-09-25"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dignity-work-db"
+database_id = "af27b2f6-5b21-4ab3-bd1a-fa24d7916f5e"

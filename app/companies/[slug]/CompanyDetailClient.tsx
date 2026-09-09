@@ -41,7 +41,7 @@ export function CompanyDetailClient({ slug }: { slug: string }) {
     setSupporting(true);
     setSupportMsg(null);
     try {
-      const ok = await supportCompany(company.id);
+      const ok = await supportCompany(company.id, company.slug);
       setSupportMsg(ok ? "感谢你的支持 ❤️" : "你已经支持过这家企业了");
       refresh();
     } catch {
