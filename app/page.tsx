@@ -173,20 +173,28 @@ export default function HomePage() {
           <p className="mb-8 text-center text-xs font-medium uppercase tracking-widest text-ink-400">
             我们希望看到的正向循环
           </p>
-          <div className="grid gap-3 sm:grid-cols-5 sm:gap-4">
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-1.5">
             {[
               "更好的劳动待遇",
               "更多收入 + 时间 + 保障",
               "更有能力的消费者",
               "更健康的市场",
               "更好的产品与服务",
-            ].map((step) => (
-              <div
-                key={step}
-                className="rounded-2xl border border-ink-100 bg-white p-5 text-center"
-              >
-                <p className="text-sm font-semibold text-ink-900">{step}</p>
-              </div>
+            ].map((step, i, arr) => (
+              <Fragment key={step}>
+                <div className="flex-1 rounded-2xl border border-ink-100 bg-white py-5 px-4 text-center">
+                  <p className="text-sm font-semibold text-ink-900">{step}</p>
+                </div>
+                {i < arr.length - 1 && (
+                  <span
+                    aria-hidden
+                    className="flex shrink-0 items-center justify-center text-ink-400"
+                  >
+                    <ArrowDown className="h-4 w-4 sm:hidden" />
+                    <ArrowRight className="hidden h-4 w-4 sm:block" />
+                  </span>
+                )}
+              </Fragment>
             ))}
           </div>
           <p className="mt-10 text-center font-serif text-2xl font-medium leading-tight text-ink-900 sm:text-3xl">
