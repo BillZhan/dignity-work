@@ -1,7 +1,8 @@
 "use client";
 
+import { Fragment } from "react";
 import Link from "next/link";
-import { ArrowRight, Sparkles, Heart } from "lucide-react";
+import { ArrowRight, ArrowDown, Sparkles, Heart } from "lucide-react";
 import { useCompanies } from "@/lib/data";
 import { CompanyCard } from "@/components/CompanyCard";
 
@@ -81,20 +82,28 @@ export default function HomePage() {
           <p className="mb-8 text-center text-xs font-medium uppercase tracking-widest text-ink-400">
             一个恶性循环
           </p>
-          <div className="grid gap-3 sm:grid-cols-5 sm:gap-4">
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-1.5">
             {[
               "低价竞争",
               "压缩成本",
               "压缩劳动",
               "消费下降",
               "更激烈的低价竞争",
-            ].map((step) => (
-              <div
-                key={step}
-                className="rounded-2xl bg-ink-50 p-5 text-center"
-              >
-                <p className="text-sm font-semibold text-ink-900">{step}</p>
-              </div>
+            ].map((step, i, arr) => (
+              <Fragment key={step}>
+                <div className="flex-1 rounded-2xl bg-ink-50 py-5 px-4 text-center">
+                  <p className="text-sm font-semibold text-ink-900">{step}</p>
+                </div>
+                {i < arr.length - 1 && (
+                  <span
+                    aria-hidden
+                    className="flex shrink-0 items-center justify-center text-ink-400"
+                  >
+                    <ArrowDown className="h-4 w-4 sm:hidden" />
+                    <ArrowRight className="hidden h-4 w-4 sm:block" />
+                  </span>
+                )}
+              </Fragment>
             ))}
           </div>
         </div>
@@ -335,7 +344,7 @@ export default function HomePage() {
           <div className="mt-10 max-w-2xl">
             <p className="text-sm text-ink-300">最终，我们希望推动市场从</p>
             <p className="mt-2 text-sm text-ink-400 line-through">
-              "牺牲劳动者的低价竞争"
+              「牺牲劳动者的低价竞争」
             </p>
             <p className="mt-2 text-sm text-ink-300">走向</p>
             <p className="mt-2 font-serif text-xl font-medium text-white sm:text-2xl">
