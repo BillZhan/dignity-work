@@ -32,6 +32,22 @@ git -c http.proxy=http://127.0.0.1:7890 -c https.proxy=http://127.0.0.1:7890 pus
 
 ---
 
+## 🔐 后台鉴权架构（重要）
+
+**绝对不要使用 `NEXT_PUBLIC_ADMIN_PASSWORD`！**
+
+后端鉴权走 **Cloudflare Pages Functions**（`/functions/api/admin/*`）：
+- 密码存在 **服务端环境变量** `ADMIN_PASSWORD` 中（无 `NEXT_PUBLIC_` 前缀）
+- 客户端 JS bundle **永远不会包含密码**
+- 登录后下发 **HttpOnly + Secure + SameSite=Lax** 的签名 cookie
+- HMAC-SHA256 签名防伪造，24 小时自动过期
+- `_middleware.ts` 保护所有 `/api/admin/*` 端点
+
+因此部署前必须做：
+1. 强密码（≥ 12 位，含大小写数字符号）
+2. Cloudflare Pages 环境变量只设 `ADMIN_PASSWORD` 和 `SESSION_SECRET`（不带 NEXT_PUBLIC_）
+3. 永远不要把任何密码 commit 到 git
+
 ## 方案 A · Cloudflare Pages（推荐，免费 + 全球 CDN + 自动 HTTPS）
 
 ### Step 1 · 把代码推到 GitHub
@@ -109,7 +125,8 @@ git push -u origin main
 |------|----|---------|
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://xxxxx.supabase.co` | Production + Preview |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJ...`（你的 anon key）| Production + Preview |
-| `NEXT_PUBLIC_ADMIN_PASSWORD` | 你的强密码（不要用默认 `dignity2026`）| Production + Preview |
+| `ADMIN_PASSWORD`              | 你的强密码（至少 12 位）            | Production + Preview |
+| `SESSION_SECRET`               | 会话签名密钥（推荐独立强随机）      | Production + Preview |
 | `NODE_VERSION` | `22` | Production + Preview |
 
 > ⚠️ 如果暂时不接入 Supabase，留空即可，网站会用本地 mock 模式运行。
@@ -189,7 +206,7 @@ moduleUser = nextConfig;
 
 ## 部署后必做清单
 
-- [ ] 在 Cloudflare Pages 设置 `NEXT_PUBLIC_ADMIN_PASSWORD` 为强密码
+- [ ] 在 Cloudflare Pages 设置 `ADMIN_PASSWORD`（至少 12 位强密码）
 - [ ] （可选）接入 Supabase，让数据持久化
 - [ ] 测试 ❤️ 支持按钮：刷新页面看是否依然显示"已支持"
 - [ ] 测试 /submit 表单提交
@@ -221,7 +238,7 @@ moduleUser = nextConfig;
 | Cloudflare 构建失败 | 查看 build log，通常是 Node 版本不对，添加 `NODE_VERSION=22` 环境变量 |
 | 404 页面找不到 | 检查 `next.config.js` 的 `trailingSlash: true` 是否设置 |
 | 数据不显示 | 控制台检查 Supabase URL 是否可访问（浏览器打开应该返回 401 或 JSON） |
-| /admin 一直跳回登录 | 检查 `NEXT_PUBLIC_ADMIN_PASSWORD` 是否在 Cloudflare 环境变量中 |
+| /admin 一直跳回登录 | 检查 Cloudflare Pages Functions 日志，确认 `ADMIN_PASSWORD` 已配置 |
 | 首页空白 | 大概率是环境变量未生效，触发 "Retry deployment" 重新部署 |
 | GitHub 推送失败 | 检查 Personal Access Token 是否过期，或用 SSH key |
 

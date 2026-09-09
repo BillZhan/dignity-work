@@ -36,3 +36,12 @@ next-env.d.ts
 # supabase
 supabase/.branches
 supabase/.temp
+
+# cloudflare wrangler 本地缓存
+.wrangler/
+
+# WorkBuddy 本地记忆（不进公开仓库）
+.workbuddy/
+
+# GitHub Pages workflow（本地保留，待 PAT 补 workflow scope 后再提交）
+.github/workflows/

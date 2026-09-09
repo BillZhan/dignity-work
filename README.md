@@ -8,6 +8,8 @@
 [![Tailwind](https://img.shields.io/badge/Tailwind-3-38bdf8)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)]()
 
+> 🌐 **线上地址**：https://i-care.work （备用：https://dignity-work.pages.dev）
+
 ---
 
 ## 📖 文档索引
@@ -136,6 +138,25 @@ npm run export
 
 ---
 
+## 🖼️ 图片来源
+
+**当前（v1 MVP）**：所有 `cover_image` 和 `logo` 字段均来自 **Unsplash 公共 CDN**（`https://images.unsplash.com`）。
+- 这些是通用素材图片，并非各企业的真实商标或产品照
+- 数据来源：`data/companies.json`
+- 优势：免费、可商用、无需自托管
+- 限制：与企业无视觉关联，仅作占位
+
+**未来替换为真实图片**（推荐 V2）：
+1. 企业真实 logo：建议上传到 Cloudflare Images 或 Supabase Storage
+2. 真实产品图：每家企业补充 1-3 张实拍/官方图
+3. 在后台管理 → 企业管理 中编辑 `cover_image` / `logo` 字段
+
+字段定义见 `lib/types.ts`：
+```ts
+logo: string         // 200×200，企业标识
+cover_image: string   // 1200×800，品牌主视觉
+```
+
 ## ⚙️ 环境变量
 
 复制 `.env.example` 为 `.env.local`：
@@ -145,11 +166,15 @@ npm run export
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 
-# 后台管理员密码（默认 dignity2026，建议部署前修改）
-NEXT_PUBLIC_ADMIN_PASSWORD=
+# ⚠️ 服务端密钥：只在 Cloudflare Pages Functions 中可见
+# 密码至少 12 位强密码；SESSION_SECRET 推荐独立强随机字符串
+ADMIN_PASSWORD=
+SESSION_SECRET=
 ```
 
 **未配置 Supabase？** 完全没问题！所有数据走 `lib/mock-data.ts`，用户操作通过 localStorage 持久化。适合纯静态部署。
+
+> 后台鉴权走 Cloudflare Pages Functions，密码永不打包进前端 JS bundle。
 
 ---
 

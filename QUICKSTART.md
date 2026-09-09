@@ -48,7 +48,8 @@ git push -u origin main
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-NEXT_PUBLIC_ADMIN_PASSWORD=你的密码
+ADMIN_PASSWORD=你的密码（至少12位）
+SESSION_SECRET=独立的强随机字符串（推荐）
 ```
 
 6. 重启 `npm run dev`
@@ -70,9 +71,9 @@ npm run dev    # 重启看效果
 
 ## 五、后台登录
 
-访问 `/admin`，密码为 `.env.local` 中的 `NEXT_PUBLIC_ADMIN_PASSWORD`，默认是 `dignity2026`。
+访问 `/admin`，输入你在 Cloudflare Pages / `.env.local` 中设置的 `ADMIN_PASSWORD`。
 
-**生产环境务必修改！**
+**注意**：这是服务端环境变量（不带 `NEXT_PUBLIC_` 前缀），密码不会出现在前端 JS bundle 中。
 
 ---
 

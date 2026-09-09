@@ -41,11 +41,6 @@ export function Footer() {
           </p>
           <ul className="space-y-2">
             <li>
-              <Link href="/admin/" className="hover:text-ink-900">
-                后台管理
-              </Link>
-            </li>
-            <li>
               <Link href="/about/#disclaimer" className="hover:text-ink-900">
                 免责声明
               </Link>

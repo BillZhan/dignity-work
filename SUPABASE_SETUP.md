@@ -81,7 +81,8 @@ cp .env.example .env.local
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-NEXT_PUBLIC_ADMIN_PASSWORD=你的新后台密码
+ADMIN_PASSWORD=你的新后台密码（至少12位）
+SESSION_SECRET=独立的强随机字符串
 ```
 
 重启 `npm run dev`，打开控制台确认：
@@ -97,7 +98,8 @@ NEXT_PUBLIC_ADMIN_PASSWORD=你的新后台密码
 2. 添加两条：
    - `NEXT_PUBLIC_SUPABASE_URL` = `https://xxxxx.supabase.co`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `eyJ...`
-   - `NEXT_PUBLIC_ADMIN_PASSWORD` = 你的新密码
+   - `ADMIN_PASSWORD` = 你的新密码（不带 NEXT_PUBLIC_ 前缀！）
+   - `SESSION_SECRET` = 独立的强随机字符串
 3. 保存 → 触发一次重新部署（Deployments → 最新一次 → "Retry deployment"）
 
 ---

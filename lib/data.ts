@@ -276,37 +276,15 @@ export async function submitReport(payload: {
 // ============================================================
 //  Admin — 仅用于后台（mock 模式靠 localStorage 持久化）
 // ============================================================
-
-export function getAdminPassword(): string {
-  return process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "dignity2026";
-}
-
-export const ADMIN_SESSION_KEY = "dignity_admin_session";
-
-export function isAdminAuthed(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.sessionStorage.getItem(ADMIN_SESSION_KEY) === "1";
-}
-
-export function adminLogin(password: string): boolean {
-  if (password !== getAdminPassword()) return false;
-  window.sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
-  return true;
-}
-
-export function adminLogout() {
-  window.sessionStorage.removeItem(ADMIN_SESSION_KEY);
-}
+// 注意：admin 鉴权已在 /api/admin/* 通过 Cloudflare Pages Functions
+// 完成（HttpOnly cookie + HMAC 签名），密码永不下发到客户端。
+// 这里只保留管理后台的数据读写函数。
 
 export function useAdminCompanies() {
   const [data, setData] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    if (!isAdminAuthed()) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     const sb = getSupabase();
     if (sb) {
@@ -337,10 +315,6 @@ export function useAdminSubmissions() {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    if (!isAdminAuthed()) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     const sb = getSupabase();
     if (sb) {
@@ -369,10 +343,6 @@ export function useAdminReports() {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    if (!isAdminAuthed()) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     const sb = getSupabase();
     if (sb) {

@@ -11,10 +11,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import {
-  isAdminAuthed,
-  adminLogin,
-  adminLogout,
-  getAdminPassword,
   useAdminCompanies,
   useAdminSubmissions,
   useAdminReports,
@@ -23,6 +19,7 @@ import {
   adminUpdateSubmissionStatus,
   adminUpdateReportStatus,
 } from "@/lib/data";
+import { adminLogin, adminLogout, checkAdminAuth } from "@/lib/admin-auth";
 import type { Company, Submission, Report } from "@/lib/types";
 
 type Tab = "dashboard" | "companies" | "submissions" | "reports";
@@ -34,7 +31,7 @@ export function AdminShell() {
 
   useEffect(() => {
     setMounted(true);
-    setAuthed(isAdminAuthed());
+    checkAdminAuth().then(setAuthed);
   }, []);
 
   if (!mounted) return null;
@@ -79,8 +76,8 @@ export function AdminShell() {
             </NavTab>
           </nav>
           <button
-            onClick={() => {
-              adminLogout();
+            onClick={async () => {
+              await adminLogout();
               setAuthed(false);
             }}
             className="mt-4 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-ink-500 hover:bg-ink-50 hover:text-ink-900"
@@ -129,13 +126,19 @@ function NavTab({
 function LoginPanel({ onOK }: { onOK: () => void }) {
   const [pwd, setPwd] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminLogin(pwd)) {
+    setBusy(true);
+    setErr(null);
+    const ok = await adminLogin(pwd);
+    setBusy(false);
+    if (ok) {
       onOK();
     } else {
       setErr("密码错误");
+      setPwd("");
     }
   };
 
@@ -146,7 +149,7 @@ function LoginPanel({ onOK }: { onOK: () => void }) {
           <Lock className="h-5 w-5 text-ink-700" />
         </div>
         <h1 className="font-serif text-2xl font-medium">后台管理</h1>
-        <p className="mt-2 text-sm text-ink-500">请输入管理员密码以继续</p>
+        <p className="mt-2 text-sm text-ink-500">仅审核员可登录</p>
         <form onSubmit={submit} className="mt-6 space-y-3 text-left">
           <input
             type="password"
@@ -155,18 +158,12 @@ function LoginPanel({ onOK }: { onOK: () => void }) {
             placeholder="管理员密码"
             className="input-field"
             autoFocus
+            disabled={busy}
           />
           {err && <p className="text-xs text-accent">{err}</p>}
-          <button type="submit" className="btn-primary w-full">
-            登录
+          <button type="submit" className="btn-primary w-full" disabled={busy}>
+            {busy ? "验证中…" : "登录"}
           </button>
-          <p className="text-center text-xs text-ink-400">
-            默认密码：<code className="rounded bg-ink-100 px-1.5 py-0.5">
-              {getAdminPassword()}
-            </code>
-            <br />
-            可通过环境变量 <code>NEXT_PUBLIC_ADMIN_PASSWORD</code> 修改
-          </p>
         </form>
       </div>
     </div>
